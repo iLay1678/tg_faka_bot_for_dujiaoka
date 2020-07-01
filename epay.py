@@ -7,8 +7,8 @@ import re
 
 
 def make_data_dict(money, name, trade_id):
-    data = {'pid': ID, 'sitename': 'Faka_Bot'}
-    data.update(notify_url=JUMP_URL, return_url=JUMP_URL, money=money, name=name, out_trade_no=trade_id)
+    data = {'notify_url': JUMP_URL, 'pid': ID, 'return_url': JUMP_URL, 'sitename': 'Faka_Bot'}
+    data.update(money=money, name=name, out_trade_no=trade_id)
     return data
 
 
