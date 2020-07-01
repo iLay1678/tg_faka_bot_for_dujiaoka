@@ -6,8 +6,8 @@ import json
 import re
 
 
-def make_data_dict(money, name, trade_id):
-    data = {'notify_url': JUMP_URL, 'pid': ID, 'return_url': JUMP_URL, 'sitename': 'Faka_Bot'}
+def make_data_dict(money, name, trade_id,paytype):
+    data = {'notify_url': JUMP_URL, 'pid': ID, 'return_url': JUMP_URL, 'sitename': 'Faka_Bot','type':paytype}
     data.update(money=money, name=name, out_trade_no=trade_id)
     return data
 
@@ -22,21 +22,12 @@ def epay_submit(order_data):
     sign = hashlib.md5(wait_for_sign_str.encode('utf-8')).hexdigest()
     order_data.update(sign=sign, sign_type='MD5')
     try:
-        req = requests.post(API + 'submit.php', data=order_data)
+        req = requests.post(API + 'qrcode.php', data=order_data)
         # print(req.text)
-        content = re.search(r"<script>(.*)</script>", req.text).group(1)
-        # print(content)
-        if 'http' in content:
-            pay_url = re.search(r"href=\'(.*)\'", content).group(1)
-            return pay_url
-        else:
-            pay_url = API + re.search(r"\.\/(.*)\'", content).group(1)
-            print(pay_url)
-            trade_no = re.search(r'trade_no=(\d*)', content).group(1)
-            print(trade_no)
-            site_name = re.search(r"sitename=(.+?)'", content).group(1)
-            print(site_name)
-            return pay_url
+        content = re.search(r"(\{.*?\})", req.text).group(1)
+        rst_dict = json.loads(content)
+        pay_url = str(rst_dict['code_url'])
+        return pay_url
     except Exception as e:
         print('submit | API请求失败')
         print(e)

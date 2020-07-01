@@ -10,6 +10,7 @@ import datetime
 import random
 import os
 import html2text
+import urllib.parse
 from epay import make_data_dict, epay_submit, check_status
 
 ROUTE, CATEGORY, PRICE, SUBMIT, TRADE = range(5)
@@ -36,7 +37,10 @@ def run_bot():
                 CallbackQueryHandler(user_price_filter, pattern='.*?'),
             ],
             SUBMIT: [
-                CallbackQueryHandler(submit_trade, pattern='^' + str('提交订单') + '$'),
+                CallbackQueryHandler(pay_way, pattern='^' + str('提交订单') + '$'),
+                CallbackQueryHandler(submit_trade, pattern='^' + str('支付宝') + '$'),
+                CallbackQueryHandler(submit_trade, pattern='^' + str('微信') + '$'),
+                CallbackQueryHandler(submit_trade, pattern='^' + str('QQ钱包') + '$'),
                 CallbackQueryHandler(cancel_trade, pattern='^' + str('下次一定') + '$')
             ],
             TRADE: [
@@ -178,13 +182,36 @@ def user_price_filter(update, context):
         )
         return SUBMIT
 
-
+def pay_way(update, context):
+    query = update.callback_query
+    query.answer()
+    keyboard = [
+            [InlineKeyboardButton("支付宝", callback_data=str('支付宝')),
+             InlineKeyboardButton("微信", callback_data=str('微信')),
+             InlineKeyboardButton("QQ钱包", callback_data=str('QQ钱包'))
+             ]
+        ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    query.edit_message_text(
+            text="请选择支付方式：",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    return SUBMIT
+    
 def submit_trade(update, context):
     query = update.callback_query
     query.answer()
     user = update.callback_query.message.chat
     user_id = user.id
     username = user.username
+    pay_name = update.callback_query.data
+    if pay_name == '支付宝':
+        paytype = 'alipay'
+    elif pay_name == '微信':
+        paytype = 'wxpay'
+    elif pay_name == 'QQ钱包':
+        paytype = 'qqpay'
     try:
         conn = sqlite3.connect('faka.sqlite3')
         cursor = conn.cursor()
@@ -214,7 +241,7 @@ def submit_trade(update, context):
             cursor.close()
             conn.close()
             now_time = int(time.time())
-            trade_data = make_data_dict(price, name, trade_id)
+            trade_data = make_data_dict(price, name, trade_id, paytype)
             pay_url = epay_submit(trade_data)
             if pay_url != 'API请求失败':
                 print('API请求成功，已成功返回支付链接')
@@ -225,14 +252,11 @@ def submit_trade(update, context):
                                 card_content, user_id, username, now_time, 'unpaid',))
                 conn.commit()
                 conn.close()
-                keyboard = [[InlineKeyboardButton("点击跳转支付", url=pay_url)]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
                 query.edit_message_text(
-                    '请在{}s内支付完成，超时支付会导致发货失败！\n'
-                    '[点击这里]({})跳转支付，或者点击下方跳转按钮'.format(PAY_TIMEOUT, pay_url),
-                    parse_mode='Markdown',
-                    reply_markup=reply_markup
+                    '请使用{}扫一扫支付，务必在{}s内支付完成，超时支付会导致发货失败！'.format(pay_name,PAY_TIMEOUT),
+                    parse_mode='Markdown'
                 )
+                bot.send_photo(chat_id=user_id,photo='https://api.961678.xyz/qrcode/{}'.format(urllib.parse.quote(pay_url,safe="")))
             return ConversationHandler.END
         else:
             query.edit_message_text('您存在未支付订单，请支付或等待订单过期后重试！')
