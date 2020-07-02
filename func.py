@@ -67,10 +67,6 @@ def get_trade_id():
     return unique_num
 
 
-def icancel(update, context):
-    update.message.reply_text('期待再次见到你～ /{}'.format(ADMIN_COMMAND_START))
-    return ConversationHandler.END
-
 
 # -----------------------用户函数区域-------------------------------
 # -----------------------用户函数区域-------------------------------
@@ -252,12 +248,23 @@ def submit_trade(update, context):
                                 card_content, user_id, username, now_time, 'unpaid',))
                 conn.commit()
                 conn.close()
-                query.edit_message_text(
-                    '请使用{}扫一扫支付，务必在{}s内支付完成，超时支付会导致发货失败！'.format(pay_name,PAY_TIMEOUT),
+                bot.send_photo(
+                    chat_id=user_id,
+                    photo='https://api.961678.xyz/qrcode/{}'.format(urllib.parse.quote(pay_url,safe="")),
+                    caption='请使用{}扫一扫支付，务必在{}s内支付完成，超时支付会导致发货失败！'.format(pay_name,PAY_TIMEOUT),
                     parse_mode='Markdown'
-                )
-                bot.send_photo(chat_id=user_id,photo='https://api.961678.xyz/qrcode/{}'.format(urllib.parse.quote(pay_url,safe="")))
-            return ConversationHandler.END
+                    )
+                return ConversationHandler.END
+            else :
+                keyboard = [
+                    [InlineKeyboardButton("支付宝", callback_data=str('支付宝')),
+                    InlineKeyboardButton("微信", callback_data=str('微信')),
+                    InlineKeyboardButton("QQ钱包", callback_data=str('QQ钱包'))
+                    ]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                query.edit_message_text(text='当前支付方式维护，请选择其他支付方式',reply_markup=reply_markup)
+                return SUBMIT
         else:
             query.edit_message_text('您存在未支付订单，请支付或等待订单过期后重试！')
             return ConversationHandler.END
@@ -268,7 +275,8 @@ def submit_trade(update, context):
 def cancel_trade(update, context):
     query = update.callback_query
     query.answer()
-    query.edit_message_text(text="记得哦～下次一定")
+    query.edit_message_text(text='记得哦～下次一定 \n\n'
+                                 '主菜单: /start')
     return ConversationHandler.END
 
 
@@ -289,7 +297,8 @@ def trade_query(update, context):
     trade_list = cursor.fetchone()
     conn.close()
     if trade_list is None:
-        update.message.reply_text('订单号有误，请确认后输入！')
+        update.message.reply_text('订单号有误，请确认后输入\n\n'
+                                  '主菜单: /start')
         return ConversationHandler.END
     elif trade_list[10] == 'locking':
         goods_name = trade_list[2]
@@ -299,7 +308,9 @@ def trade_query(update, context):
             '*订单查询成功*!\n'
             '订单号：`{}`\n'
             '订单状态：*已取消*\n'
-            '原因：*逾期未付*'.format(trade_id),
+            '原因：*逾期未付*\n\n'
+            '主菜单: /start'
+            .format(trade_id),
             parse_mode='Markdown',
         )
         return ConversationHandler.END
@@ -314,14 +325,16 @@ def trade_query(update, context):
             '订单号：`{}`\n'
             '商品：*{}*\n'
             '描述：*{}*\n'
-            '卡密内容：`{}`\n'.format(trade_id, goods_name, description, card_context),
+            '卡密内容：`{}`\n\n'
+            '主菜单: /start'.format(trade_id, goods_name, description, card_context),
             parse_mode='Markdown',
         )
         return ConversationHandler.END
 
 
 def cancel(update, context):
-    update.message.reply_text('期待再次见到你～')
+    update.message.reply_text('期待再次见到你～ \n\n'
+                              '主菜单: /start')
     return ConversationHandler.END
 
 
@@ -394,9 +407,3 @@ def check_trade():
         print('---------------订单轮询结束---------------')
         time.sleep(10)
 
-
-def clear_html_re(src_html):
-    content = re.sub(r"</?(.+?)>", "", src_html) # 去除标签
-    # content = re.sub(r"&nbsp;", "", content)
-    dst_html = re.sub(r"\s+", "", content)  # 去除空白字符
-    return dst_html
