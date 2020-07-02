@@ -2,7 +2,7 @@ import threading
 import telegram
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton, ForceReply
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackQueryHandler
-from config import TOKEN,PAY_TIMEOUT,DB_HOST,DB_PORT,DB_DATABASE,DB_USERNAME,DB_PASSWORD,NAME, ADMIN_ID, ADMIN_COMMAND_START, ADMIN_COMMAND_QUIT
+from config import TOKEN,PAY_TYPE,PAY_TIMEOUT,DB_HOST,DB_PORT,DB_DATABASE,DB_USERNAME,DB_PASSWORD,NAME, ADMIN_ID, ADMIN_COMMAND_START, ADMIN_COMMAND_QUIT
 import pymysql.cursors
 import sqlite3
 import time
@@ -54,9 +54,7 @@ def run_bot():
             ],
             SUBMIT: [
                 CallbackQueryHandler(pay_way, pattern='^' + str('提交订单') + '$'),
-                CallbackQueryHandler(submit_trade, pattern='^' + str('支付宝') + '$'),
-                CallbackQueryHandler(submit_trade, pattern='^' + str('微信') + '$'),
-                CallbackQueryHandler(submit_trade, pattern='^' + str('QQ钱包') + '$'),
+                CallbackQueryHandler(submit_trade, pattern='^' + '(支付宝|微信|QQ钱包)' + '$'),
                 CallbackQueryHandler(cancel_trade, pattern='^' + str('下次一定') + '$')
             ],
             TRADE: [
@@ -189,6 +187,7 @@ def admin_trade_func_exec(update, context):
             user_id = trade_list[7]
             username = trade_list[8]
             cursor.execute('update trade set card_contents=? where trade_id=?', (content, trade_id,))
+            cursor.execute('update trade set status=? where trade_id=?', ('paid', trade_id,))
             conn.commit()
             conn.close()
             bot.send_message(
@@ -343,13 +342,13 @@ def user_price_filter(update, context):
 def pay_way(update, context):
     query = update.callback_query
     query.answer()
-    keyboard = [
-            [InlineKeyboardButton("支付宝", callback_data=str('支付宝')),
-             InlineKeyboardButton("微信", callback_data=str('微信')),
-             InlineKeyboardButton("QQ钱包", callback_data=str('QQ钱包'))
-             ]
+    keyboard=[]
+    keyboards = [
+        keyboard
         ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    for i in PAY_TYPE:
+        keyboard.append(InlineKeyboardButton(i, callback_data=str(i)))
+    reply_markup = InlineKeyboardMarkup(keyboards)
     query.edit_message_text(
             text="请选择支付方式：",
             parse_mode='Markdown',
@@ -411,10 +410,8 @@ def submit_trade(update, context):
                                 card_content, user_id, username, now_time, 'unpaid',))
                 conn.commit()
                 conn.close()
-                bot.send_photo(
-                    chat_id=user_id,
-                    photo='https://api.961678.xyz/qrcode/{}'.format(urllib.parse.quote(pay_url,safe="")),
-                    caption='请使用{}扫一扫支付，务必在{}s内支付完成，超时支付会导致发货失败！'.format(pay_name,PAY_TIMEOUT),
+                query.edit_message_text(
+                   text = "请使用{}扫一扫支付，务必在{}s内支付完成，超时支付会导致发货失败！[​​​​​​​​​​​](https://api.961678.xyz/qrcode/{}".format(pay_name,PAY_TIMEOUT,urllib.parse.quote(pay_url,safe="")),
                     parse_mode='Markdown'
                     )
                 return ConversationHandler.END
@@ -493,8 +490,43 @@ def trade_query(update, context):
             parse_mode='Markdown',
         )
         return ConversationHandler.END
-
-
+    elif trade_list[10] == 'locking':
+        trade_id = trade_list[0]
+        goods_name = trade_list[2]
+        description = trade_list[3]
+        use_way = trade_list[4]
+        card_context = trade_list[6]
+        update.message.reply_text(
+            '*订单查询成功*!\n'
+            '订单号：`{}`\n'
+            '订单状态：*已取消*\n'
+            '原因：*逾期未付*\n\n'
+            '主菜单: /start'
+            .format(trade_id),
+            parse_mode='Markdown',
+        )
+        return ConversationHandler.END
+    elif trade_list[10] == 'unpaid':
+        trade_id = trade_list[0]
+        goods_name = trade_list[2]
+        description = trade_list[3]
+        use_way = trade_list[4]
+        card_context = trade_list[6]
+        update.message.reply_text(
+            '*订单查询成功*!\n'
+            '订单号：`{}`\n'
+            '订单状态：*待支付*\n'
+            '主菜单: /start'
+            .format(trade_id),
+            parse_mode='Markdown',
+        )
+        return ConversationHandler.END
+    else :
+        update.message.reply_text(
+            '订单不存在!\n',
+            parse_mode='Markdown',
+        )
+        return ConversationHandler.END
 def cancel(update, context):
     update.message.reply_text('期待再次见到你～ \n\n'
                               '主菜单: /start')
