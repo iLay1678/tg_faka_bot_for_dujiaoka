@@ -2,7 +2,7 @@ import threading
 import telegram
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton, ForceReply
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackQueryHandler
-from config import TOKEN,PAY_TIMEOUT,DB_HOST,DB_PORT,DB_DATABASE,DB_USERNAME,DB_PASSWORD,NAME
+from config import TOKEN,PAY_TIMEOUT,DB_HOST,DB_PORT,DB_DATABASE,DB_USERNAME,DB_PASSWORD,NAME, ADMIN_ID, ADMIN_COMMAND_START, ADMIN_COMMAND_QUIT
 import pymysql.cursors
 import sqlite3
 import time
@@ -14,14 +14,30 @@ import urllib.parse
 from epay import make_data_dict, epay_submit, check_status
 
 ROUTE, CATEGORY, PRICE, SUBMIT, TRADE = range(5)
-CATEGORY_FUNC_EXEC  = range(11)
+ADMIN_TRADE_ROUTE, ADMIN_TRADE_EXEC, CATEGORY_FUNC_EXEC = range(3)
 bot = telegram.Bot(token=TOKEN)
 
 
 def run_bot():
     updater = Updater(token=TOKEN, use_context=True)
     dispatcher = updater.dispatcher
+    admin_handler = ConversationHandler(
+        entry_points=[CommandHandler(ADMIN_COMMAND_START, admin)],
 
+        states={
+            ADMIN_TRADE_ROUTE: [
+                CommandHandler('{}'.format(ADMIN_COMMAND_QUIT), icancel),
+                CallbackQueryHandler(trade_func_route, pattern='^' + '(查询订单|重新激活订单)' + '$'),
+            ],
+            ADMIN_TRADE_EXEC: [
+                CommandHandler('{}'.format(ADMIN_COMMAND_QUIT), icancel),
+                MessageHandler(Filters.text, admin_trade_func_exec)
+            ],
+        },
+        conversation_timeout=20,
+        fallbacks=[CommandHandler('{}'.format(ADMIN_COMMAND_QUIT), icancel)]
+    )
+    
     start_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
 
@@ -52,7 +68,8 @@ def run_bot():
     )
 
     dispatcher.add_handler(start_handler)
-
+    dispatcher.add_handler(admin_handler)
+    
     updater.start_polling()
     updater.idle()
 
@@ -66,7 +83,116 @@ def get_trade_id():
     unique_num = str(now_time) + str(random_num)
     return unique_num
 
+# -----------------------管理员函数区域-------------------------------
+# -----------------------管理员函数区域-------------------------------
+def admin(update, context):
+    if is_admin(update, context):
+        keyboard = [
+            [
+                InlineKeyboardButton("查询订单", callback_data=str('查询订单')),
+                InlineKeyboardButton("重新激活订单", callback_data=str('重新激活订单')),
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        update.message.reply_text(
+            '请选择指令：',
+            reply_markup=reply_markup
+        )
+        return ADMIN_TRADE_ROUTE
+def trade_func_route(update, context):
+    query = update.callback_query
+    query.answer()
+    if update.callback_query.data == '查询订单':
+        context.user_data['func'] = '查询订单'
+        query.edit_message_text(text="请回复您需要查询的订单号：")
+        return ADMIN_TRADE_EXEC
+    elif update.callback_query.data == '重新激活订单':
+        context.user_data['func'] = '重新激活订单'
+        query.edit_message_text(text="请回复您需要重新激活的订单号：")
+        return ADMIN_TRADE_EXEC
 
+
+def admin_trade_func_exec(update, context):
+    try:
+        trade_id = update.message.text
+        print(trade_id)
+        func = context.user_data['func']
+        print(func)
+        if func == '查询订单':
+            conn = sqlite3.connect('faka.sqlite3')
+            cursor = conn.cursor()
+            cursor.execute('select * from trade where trade_id=?', (trade_id,))
+            trade_list = cursor.fetchone()
+            conn.close()
+            if trade_list is None:
+                update.message.reply_text('订单号有误，请确认后输入！')
+                return ConversationHandler.END
+            else:
+                if trade_list[10] == 'paid':
+                    status = '已支付'
+                elif trade_list[10] == 'locking':
+                    status = '已锁定'
+                elif trade_list[10] == 'unpaid':
+                    status = '未支付'
+                goods_name = trade_list[2]
+                description = trade_list[3]
+                username = trade_list[8]
+                card_context = trade_list[6]
+                use_way = trade_list[4]
+                trade_id = trade_list[0]
+                update.message.reply_text(
+                    '*订单查询成功*!\n'
+                    '订单号：`{}`\n'
+                    '订单状态：{}\n'
+                    '下单用户：@{}\n'
+                    '卡密内容：`{}`\n'
+                    '描述：*{}*\n'
+                    '使用方法：*{}*'.format(trade_id, status, username, card_context, description, use_way),
+                    parse_mode='Markdown',
+                )
+                return ConversationHandler.END
+        elif func == '重新激活订单':
+            now_time = int(time.time())
+            print(now_time)
+            conn = sqlite3.connect('faka.sqlite3')
+            cursor = conn.cursor()
+            cursor.execute("select * from trade where trade_id=?", (trade_id,))
+            trade = cursor.fetchone()
+            status = trade[10]
+            goods_id = trade[1]
+            if status=='paid':
+                update.message.reply_text('该订单已支付，无法重新激活')
+                return ConversationHandler.END
+            else:
+                cursor.execute('update trade set creat_time=? where trade_id=?', (now_time, trade_id,))
+                cursor.execute('update trade set status=? where trade_id=?', ('unpaid', trade_id,))
+                conn.commit()
+                conn.close()
+                conn = pymysql.connect(host=DB_HOST,port=DB_PORT,user=DB_USERNAME,password=DB_PASSWORD,db=DB_DATABASE,cursorclass=pymysql.cursors.DictCursor)
+                cursor = conn.cursor()
+                cursor.execute("update products set in_stock=in_stock-1 where id=%s", (goods_id,))
+                conn.commit()
+                cursor.close()
+                conn.close()
+                update.message.reply_text('该订单已经被重新激活，请用户在{}内支付'.format(PAY_TIMEOUT))
+                return ConversationHandler.END
+    except Exception as e:
+        print(e)
+
+
+def is_admin(update, context):
+    if update.message.from_user.id in ADMIN_ID:
+        return True
+    else:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text='*非管理员，无权操作*',
+            parse_mode='Markdown'
+        )
+        return False
+def icancel(update, context):
+    update.message.reply_text('期待再次见到你～ /{}'.format(ADMIN_COMMAND_START))
+    return ConversationHandler.END
 
 # -----------------------用户函数区域-------------------------------
 # -----------------------用户函数区域-------------------------------
@@ -121,9 +247,7 @@ def goods_filter(update, context):
     goods = cursor.fetchall()
     for i in goods:
         goods_id = i['id']
-        cursor.execute("select * from cards where product_id=%s and card_status=%s", (goods_id, '1'))
-        active_cards = cursor.fetchall()
-        goods_list = [InlineKeyboardButton(i['pd_name'] + ' | 价格:{} | 库存:{} '.format(i['actual_price'],len(active_cards)),
+        goods_list = [InlineKeyboardButton(i['pd_name'] + ' | 价格:{} | 库存:{} '.format(i['actual_price'],i['in_stock']),
                                            callback_data=str(i['id']))]
         keyboard.append(goods_list)
     conn.close()
@@ -149,15 +273,14 @@ def user_price_filter(update, context):
     cursor.execute("select * from products where pd_class=%s and id=%s", (category_name, goods_name,))
     goods = cursor.fetchone()
     goods_id = goods['id']
-    cursor.execute("select * from cards where product_id=%s and card_status=%s", (goods_id, '1'))
-    active_cards = cursor.fetchall()
+    in_stock = goods['in_stock']
     conn.close()
-    if len(active_cards) == 0 :
+    if in_stock == 0 :
         query.edit_message_text(text="该商品暂时*无库存*，等待补货\n"
                                      "会话已结束，使用 /start 重新发起会话",
                                 parse_mode='Markdown', )
         return ConversationHandler.END
-    elif len(active_cards) > 0:
+    elif in_stock > 0:
         goods_name=goods['pd_name']
         price = goods['actual_price']
         descrip = html2text.html2text(goods['pd_info'])
@@ -228,10 +351,8 @@ def submit_trade(update, context):
             goods_info = cursor.fetchone()
             description = html2text.html2text(goods_info['pd_info'])
             use_way = html2text.html2text(goods_info['pd_info'])
-            cursor.execute("select * from cards where product_id=%s and card_status=%s", (goods_id, '1'))
-            card_info = cursor.fetchone()
-            card_id = card_info['id']
-            card_content = card_info['card_info']
+            card_id = 'no'
+            card_content = 'no'
             cursor.execute("update products set in_stock=in_stock-1 where id=%s", (goods_id,))
             conn.commit()
             cursor.close()
@@ -355,8 +476,6 @@ def check_trade():
             goods_name = i[2]
             description = i[3]
             use_way = i[4]
-            card_context = i[6]
-            card_id = i[5]
             sub_time = now_time - int(creat_time)
             print(sub_time)
             if sub_time >= PAY_TIMEOUT:
@@ -382,14 +501,21 @@ def check_trade():
                 try:
                     rst = check_status(trade_id)
                     if rst == '支付成功':
+                        conn = pymysql.connect(host=DB_HOST,port=DB_PORT,user=DB_USERNAME,password=DB_PASSWORD,db=DB_DATABASE,cursorclass=pymysql.cursors.DictCursor)
+                        cursor = conn.cursor()
+                        cursor.execute("select * from cards where product_id=%s and card_status=%s", (goods_id, '1'))
+                        card=cursor.fetchone()
+                        card_context = card['card_info']
+                        card_id=card['id']
+                        cursor.execute("update cards set card_status=%s where id=%s", ('2', card_id,))
+                        cursor.execute("update cards set updated_at=%s where id=%s", (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), card_id,))
+                        conn.commit()
+                        conn.close()
                         conn = sqlite3.connect('faka.sqlite3')
                         cursor = conn.cursor()
                         cursor.execute("update trade set status=? where trade_id=?", ('paid', trade_id,))
-                        conn.commit()
-                        conn.close()
-                        conn = pymysql.connect(host=DB_HOST,port=DB_PORT,user=DB_USERNAME,password=DB_PASSWORD,db=DB_DATABASE,cursorclass=pymysql.cursors.DictCursor)
-                        cursor = conn.cursor()
-                        cursor.execute("update cards set card_status=%s where id=%s", ('2', card_id,))
+                        cursor.execute("update trade set card_contents=? where trade_id=?", (card_context, trade_id,))
+                        cursor.execute("update trade set card_id=? where trade_id=?", (card_id, trade_id,))
                         conn.commit()
                         conn.close()
                         bot.send_message(
