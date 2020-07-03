@@ -2,7 +2,7 @@ import threading
 import telegram
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton, ForceReply
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackQueryHandler
-from config import TOKEN,PAY_TYPE,PAY_TIMEOUT,DB_HOST,DB_PORT,DB_DATABASE,DB_USERNAME,DB_PASSWORD,NAME, ADMIN_ID, ADMIN_COMMAND_START, ADMIN_COMMAND_QUIT
+from config import TOKEN,PAY_TYPE,PAY_TIMEOUT,DB_HOST,DB_PORT,DB_DATABASE,DB_USERNAME,DB_PASSWORD,NOTICE, ADMIN_ID, ADMIN_COMMAND_START, ADMIN_COMMAND_QUIT
 import pymysql.cursors
 import sqlite3
 import time
@@ -238,8 +238,8 @@ def start(update, context):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text(
-        "欢迎光临{}\n"
-        '请选择您的操作：'.format(NAME),
+        "{}\n\n"
+        '请选择您的操作：'.format(NOTICE),
         reply_markup=reply_markup
     )
     return ROUTE
