@@ -6,6 +6,7 @@ API = 'https://home.bakbak.cn/'
 ID = 12123
 # 商户密钥
 KEY = 'DZNEk2dQzKdaD10NCX0RwR'
+# 支付方式
 PAY_TYPE = ['支付宝','微信','QQ钱包']
 # 支付成功跳转地址
 JUMP_URL = "https://kangle.bakbak.cn/paysuccess.html"
