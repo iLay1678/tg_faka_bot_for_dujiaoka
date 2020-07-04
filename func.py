@@ -545,7 +545,7 @@ def cancel(update, context):
     return ConversationHandler.END
 
 def timeout(update, context):
-    update.message.reply_text('会话超时，如您有未支付订单，可继续支付\n期待再次见到你～ \n\n'
+    update.message.reply_text('会话超时，期待再次见到你～ \n\n'
                               '主菜单: /start')
     return ConversationHandler.END
 
