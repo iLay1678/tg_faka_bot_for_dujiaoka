@@ -34,7 +34,7 @@ def run_bot():
                 MessageHandler(Filters.text, admin_trade_func_exec)
             ],
         },
-        conversation_timeout=20,
+        conversation_timeout=60,
         fallbacks=[CommandHandler('{}'.format(ADMIN_COMMAND_QUIT), icancel)]
     )
     
@@ -61,7 +61,7 @@ def run_bot():
                 MessageHandler(Filters.text, trade_query)
             ],
         },
-        conversation_timeout=20,
+        conversation_timeout=60,
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
@@ -411,8 +411,12 @@ def submit_trade(update, context):
                 conn.commit()
                 conn.close()
                 query.edit_message_text(
-                   text = "请使用{}扫一扫支付，务必在{}s内支付完成，超时支付会导致发货失败！[​​​​​​​​​​​](https://api.961678.xyz/qrcode/{}".format(pay_name,PAY_TIMEOUT,urllib.parse.quote(pay_url,safe="")),
+                   text = "请使用{}扫一扫支付，务必在{}s内支付完成，超时支付会导致发货失败".format(pay_name,PAY_TIMEOUT),
                     parse_mode='Markdown'
+                    )
+                bot.send_photo(
+                    chat_id=user_id,
+                    photo='https://api.961678.xyz/qrcode/{}'.format(urllib.parse.quote(pay_url,safe=""))
                     )
                 return ConversationHandler.END
             else :
