@@ -240,6 +240,7 @@ def start(update, context):
     update.message.reply_text(
         "{}\n\n"
         '请选择您的操作：'.format(NOTICE),
+        parse_mode='Markdown',
         reply_markup=reply_markup
     )
     return ROUTE
