@@ -33,8 +33,9 @@ def run_bot():
                 CommandHandler('{}'.format(ADMIN_COMMAND_QUIT), icancel),
                 MessageHandler(Filters.text, admin_trade_func_exec)
             ],
+            ConversationHandler.TIMEOUT: [MessageHandler(Filters.all, itimeout)],
         },
-        conversation_timeout=60,
+        conversation_timeout=30,
         fallbacks=[CommandHandler('{}'.format(ADMIN_COMMAND_QUIT), icancel)]
     )
     
@@ -60,8 +61,9 @@ def run_bot():
             TRADE: [
                 MessageHandler(Filters.text, trade_query)
             ],
+            ConversationHandler.TIMEOUT: [MessageHandler(Filters.all, timeout)],
         },
-        conversation_timeout=60,
+        conversation_timeout=30,
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
@@ -225,6 +227,11 @@ def is_admin(update, context):
         return False
 def icancel(update, context):
     update.message.reply_text('期待再次见到你～ /{}'.format(ADMIN_COMMAND_START))
+    return ConversationHandler.END
+
+def itimeout(update, context):
+    update.message.reply_text('会话超时，期待再次见到你～ \n\n'
+                              '主菜单: /{}'.format(ADMIN_COMMAND_START))
     return ConversationHandler.END
 
 # -----------------------用户函数区域-------------------------------
@@ -537,6 +544,10 @@ def cancel(update, context):
                               '主菜单: /start')
     return ConversationHandler.END
 
+def timeout(update, context):
+    update.message.reply_text('会话超时，如您有未支付订单，可继续支付\n期待再次见到你～ \n\n'
+                              '主菜单: /start')
+    return ConversationHandler.END
 
 def check_trade():
     while True:
