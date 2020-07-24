@@ -1,40 +1,29 @@
-# 这是开源版本
-
-# 易支付API地址, 末尾需要包含/
-API = 'https://home.bakbak.cn/'
-
-# 商户ID
-ID = 12123
-
-# 商户密钥
-KEY = 'DZNEk2dQzKdaD10NCX0RwR'
-
-# 支付方式 可选项：'支付宝','微信','QQ钱包'
-PAY_TYPE = ['支付宝','微信','QQ钱包']
-
-# 支付成功跳转地址 本版用不到，随标填
-JUMP_URL = "https://kangle.bakbak.cn/paysuccess.html"
 
 # 支付超时时间(秒)
 PAY_TIMEOUT = 300
-
 # BOT API
-TOKEN = '129798987814:AAG4kO2l-6wuPwoPMF7imHOJtpYAI'
-
-# 公告信息，支持markdown
-NOTICE = 'IQ商城'
-
-# 独角卡数据库连接
-DB_HOST = '127.0.0.1'
-DB_PORT = 3306
-DB_DATABASE = ''
-DB_USERNAME = ''
-DB_PASSWORD = ''
-
-
+TOKEN = '1222117547:AAGWJ43CJ-4aejeoICdQ2t01wWMiIAOgJKc'
 # ADMIN ID
-ADMIN_ID = [676625294]
+ADMIN_ID = [744255323]
 
 # 管理员命令
 ADMIN_COMMAND_START = 'iadmin'
 ADMIN_COMMAND_QUIT = 'icancel'
+
+# 支持的支付方式
+PAYMENT_METHOD = {
+    'epay': {'epay':'支付宝/微信/QQ钱包','aliqr':'支付宝','wxqr':'微信','qqqr':'QQ钱包'},
+    'mugglepay':{'mugglepay':'数字货币'},
+    'stripe':{'alipay':'stripe支付宝','wxpay':'stripe微信'},
+    'alifacepay':{'alifacepay': '支付宝当面付'}
+}
+
+# 公告信息，支持markdown
+NOTICE = '欢迎光临IQ商城,本店24小时营业\n如有问题,请 联系客服 @xuebibot\n\n如出现操作卡住，请 /start 重启会话'
+
+# 独角卡数据库连接
+DB_HOST = '127.0.0.1'
+DB_PORT = 3306
+DB_DATABASE = 'shop'
+DB_USERNAME = 'shop'
+DB_PASSWORD = 'faka'

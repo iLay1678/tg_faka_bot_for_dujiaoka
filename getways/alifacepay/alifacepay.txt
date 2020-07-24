@@ -1,0 +1,1 @@
+python-alipay-sdk==2.0.1

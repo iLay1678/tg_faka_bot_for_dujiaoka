@@ -6,6 +6,9 @@ decorator==4.4.2
 future==0.18.2
 idna==2.9
 pycparser==2.20
+pycryptodomex==3.9.4
+pyOpenSSL==19.1.0
+python-alipay-sdk==2.0.1
 python-telegram-bot==12.7
 requests==2.23.0
 six==1.15.0
@@ -13,3 +16,4 @@ tornado==6.0.4
 urllib3==1.25.9
 pymysql==0.9.3
 html2text==2020.1.16
+stripe==2.48.0
